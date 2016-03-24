@@ -6,34 +6,38 @@ var zlib = require('zlib');
 module.exports = function () {
 
   function newGenre(name){
-      return { name: name, books: [] }
+    return { name: name, books: [] }
   }
+
+
+  var genreGrouper = through(write, end);
 
   var currentGenre;
 
-  function write (line, _, next){
-      line = JSON.parse(line);
+  function write (buf, _, next){
+    if (buf.length === 0) {
+      return next();
+    }
 
-      if (line["type"] === "genre"){
-          if(currentGenre) { this.push(JSON.stringify(genre) + '\n'); }
-          currentGenre = newGenre(line["name"]);
-      } else {
-        console.log(line["name"]);
-          currentGenre.books.push(line["name"]);
-      }
+    line = JSON.parse(buf);
 
-      next();
+    if (line["type"] === "genre"){
+      if(currentGenre) { this.push(JSON.stringify(currentGenre) + '\n'); }
+      currentGenre = newGenre(line["name"]);
+    } else if(line["type"] === "book"){
+      currentGenre.books.push(line["name"]);
+    }
+
+    next();
+
   }
 
   function end (done){
-      this.push(JSON.stringify(genre) + '\n');
-      done();
+    this.push(JSON.stringify(currentGenre) + '\n');
+    done();
   };
 
-  return combine(
-      split(),
-      through(write, end),
-      process.stdout
-      // zlib.createGzip()
-      );
+
+  return combine( split(), genreGrouper, zlib.createGzip());
+
 };
